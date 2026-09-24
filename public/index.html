@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Chiron Taxi</title>
 
   <style>
@@ -30,7 +30,7 @@
     }
 
     .box {
-      background: #fff;
+      background: white;
       border-radius: 12px;
       padding: 25px;
       width: min(900px, 100%);
@@ -58,14 +58,18 @@
 
     textarea {
       min-height: 70px;
+      resize: vertical;
+    }
+
+    button {
+      cursor: pointer;
     }
 
     .btn {
       border: 0;
       border-radius: 7px;
       padding: 10px 14px;
-      cursor: pointer;
-      color: #fff;
+      color: white;
       background: #374151;
     }
 
@@ -89,7 +93,7 @@
 
     aside {
       background: #111827;
-      color: #fff;
+      color: white;
       padding: 18px;
     }
 
@@ -102,14 +106,13 @@
       border: 0;
       padding: 12px;
       border-radius: 6px;
-      cursor: pointer;
       margin-bottom: 4px;
     }
 
     aside button:hover,
     aside button.active {
       background: #374151;
-      color: #fff;
+      color: white;
     }
 
     main {
@@ -145,7 +148,7 @@
     }
 
     .card {
-      background: #fff;
+      background: white;
       border: 1px solid #e5e7eb;
       border-radius: 10px;
       padding: 18px;
@@ -213,12 +216,21 @@
 
       <label>
         كلمة المرور
-        <input id="password" type="password" required>
+        <input
+          id="password"
+          type="password"
+          autocomplete="current-password"
+          required
+        >
       </label>
 
       <br>
 
-      <button type="submit" class="btn primary">
+      <button
+        id="loginButton"
+        type="submit"
+        class="btn primary"
+      >
         دخول
       </button>
 
@@ -384,14 +396,21 @@
             استيراد نسخة
           </button>
 
-          <input id="import" type="file" accept=".json" class="hidden">
+          <input
+            id="import"
+            type="file"
+            accept=".json"
+            class="hidden"
+          >
         </div>
       </section>
     </main>
   </section>
 
   <script>
-    const $ = (id) => document.getElementById(id);
+    const $ = (id) => {
+      return document.getElementById(id);
+    };
 
     let token = localStorage.getItem("token");
 
@@ -418,6 +437,7 @@
     function showApp() {
       $("login").classList.add("hidden");
       $("app").classList.remove("hidden");
+
       loadCompany();
       renderTrips();
     }
@@ -431,19 +451,41 @@
 
     function logout() {
       localStorage.removeItem("token");
+      token = null;
       location.reload();
     }
 
+    async function readResponse(response) {
+      const text = await response.text();
+
+      if (!text) {
+        return {};
+      }
+
+      try {
+        return JSON.parse(text);
+      } catch {
+        return {
+          bericht: text
+        };
+      }
+    }
+
     async function api(url, options = {}) {
-      options.headers = {
-        ...(options.headers || {}),
-        Authorization: "Bearer " + token
-      };
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...(options.headers || {}),
+          Authorization: "Bearer " + token
+        }
+      });
 
-      const response = await fetch(url, options);
-      const data = await response.json();
+      const data = await readResponse(response);
 
-      if (response.status === 401 || response.status === 403) {
+      if (
+        response.status === 401 ||
+        response.status === 403
+      ) {
         logout();
         throw new Error("انتهت الجلسة");
       }
@@ -483,19 +525,24 @@
 
       trips.forEach((trip) => {
         const wrapper = document.createElement("div");
+
         wrapper.className = "trip";
 
         const checkbox = document.createElement("input");
+
         checkbox.type = "checkbox";
         checkbox.checked = trip.selected !== false;
 
-        checkbox.addEventListener("change", () => {
-          trip.selected = checkbox.checked;
-          save();
-        });
+        checkbox.addEventListener(
+          "change",
+          () => {
+            trip.selected = checkbox.checked;
+            save();
+          }
+        );
 
         const text =
-          " إرسال\n" +
+          "إرسال\n" +
           trip.trip_id + "\n" +
           trip.start_time + " → " +
           trip.end_time + "\n" +
@@ -519,7 +566,13 @@
         event.preventDefault();
 
         const errorBox = $("loginError");
+        const loginButton = $("loginButton");
+
         errorBox.classList.add("hidden");
+        errorBox.textContent = "";
+
+        loginButton.disabled = true;
+        loginButton.textContent = "جاري الدخول...";
 
         try {
           const response = await fetch(
@@ -535,42 +588,73 @@
             }
           );
 
-          const data = await response.json();
+          const data = await readResponse(response);
 
           if (!response.ok) {
             throw new Error(
-              data.bericht || "كلمة المرور غير صحيحة"
+              data.bericht ||
+              "كلمة المرور غير صحيحة"
+            );
+          }
+
+          if (!data.token) {
+            throw new Error(
+              "لم يصل رمز الدخول من الخادم"
             );
           }
 
           token = data.token;
-          localStorage.setItem("token", token);
+
+          localStorage.setItem(
+            "token",
+            token
+          );
+
           showApp();
         } catch (error) {
-          errorBox.textContent = error.message;
+          errorBox.textContent =
+            error.message ||
+            "حدث خطأ أثناء تسجيل الدخول";
+
           errorBox.classList.remove("hidden");
+        } finally {
+          loginButton.disabled = false;
+          loginButton.textContent = "دخول";
         }
       }
     );
 
-    $("logout").addEventListener("click", logout);
+    $("logout").addEventListener(
+      "click",
+      logout
+    );
 
     document.querySelectorAll(".nav").forEach(
       (button) => {
-        button.addEventListener("click", () => {
-          document.querySelectorAll(".nav").forEach(
-            (item) => item.classList.remove("active")
-          );
+        button.addEventListener(
+          "click",
+          () => {
+            document.querySelectorAll(".nav").forEach(
+              (item) => {
+                item.classList.remove("active");
+              }
+            );
 
-          document.querySelectorAll(".page").forEach(
-            (page) => page.classList.remove("active")
-          );
+            document.querySelectorAll(".page").forEach(
+              (page) => {
+                page.classList.remove("active");
+              }
+            );
 
-          button.classList.add("active");
-          $(button.dataset.page).classList.add("active");
-          $("title").textContent =
-            button.textContent.trim();
-        });
+            button.classList.add("active");
+
+            $(button.dataset.page)
+              .classList.add("active");
+
+            $("title").textContent =
+              button.textContent.trim();
+          }
+        );
       }
     );
 
@@ -585,6 +669,7 @@
         };
 
         save();
+
         alert("تم الحفظ");
       }
     );
@@ -595,10 +680,18 @@
         try {
           const trip = {
             trip_id: $("tripId").value.trim(),
-            start_time: toIso($("start").value),
-            end_time: toIso($("end").value),
-            departure: $("departure").value.trim(),
-            destination: $("destination").value.trim(),
+            start_time: toIso(
+              $("start").value
+            ),
+            end_time: toIso(
+              $("end").value
+            ),
+            departure: $("departure")
+              .value
+              .trim(),
+            destination: $("destination")
+              .value
+              .trim(),
             selected: true,
             status: "NOT_SENT"
           };
@@ -608,10 +701,13 @@
             !trip.departure ||
             !trip.destination
           ) {
-            throw new Error("أكمل بيانات الرحلة");
+            throw new Error(
+              "أكمل بيانات الرحلة"
+            );
           }
 
           trips.push(trip);
+
           save();
           renderTrips();
 
@@ -621,9 +717,11 @@
             "end",
             "departure",
             "destination"
-          ].forEach((id) => {
-            $(id).value = "";
-          });
+          ].forEach(
+            (id) => {
+              $(id).value = "";
+            }
+          );
         } catch (error) {
           alert(error.message);
         }
@@ -633,8 +731,13 @@
     $("clear").addEventListener(
       "click",
       () => {
-        if (confirm("هل تريد حذف كل الرحلات؟")) {
+        if (
+          confirm(
+            "هل تريد حذف كل الرحلات؟"
+          )
+        ) {
           trips = [];
+
           save();
           renderTrips();
         }
@@ -646,19 +749,25 @@
       async () => {
         try {
           $("health").className = "status";
-          $("health").textContent = "جاري الفحص...";
+          $("health").textContent =
+            "جاري الفحص...";
 
           const data = await api(
             "/api/chiron/health"
           );
 
-          $("health").className = "status ok";
+          $("health").className =
+            "status ok";
+
           $("health").textContent =
             "الاتصال ناجح\n" +
             data.environment;
         } catch (error) {
-          $("health").className = "status bad";
-          $("health").textContent = error.message;
+          $("health").className =
+            "status bad";
+
+          $("health").textContent =
+            error.message;
         }
       }
     );
@@ -672,7 +781,9 @@
           );
 
           if (selected.length === 0) {
-            throw new Error("حدد رحلة واحدة على الأقل");
+            throw new Error(
+              "حدد رحلة واحدة على الأقل"
+            );
           }
 
           const payload = {
@@ -725,7 +836,11 @@
             data.request_id;
 
           $("response").textContent =
-            JSON.stringify(data, null, 2);
+            JSON.stringify(
+              data,
+              null,
+              2
+            );
         } catch (error) {
           $("sendStatus").className =
             "status bad";
@@ -742,21 +857,33 @@
         const data = {
           company,
           trips,
-          exported_at: new Date().toISOString()
+          exported_at:
+            new Date().toISOString()
         };
 
         const blob = new Blob(
-          [JSON.stringify(data, null, 2)],
+          [
+            JSON.stringify(
+              data,
+              null,
+              2
+            )
+          ],
           {
             type: "application/json"
           }
         );
 
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
+        const url =
+          URL.createObjectURL(blob);
+
+        const link =
+          document.createElement("a");
 
         link.href = url;
-        link.download = "chiron-backup.json";
+        link.download =
+          "chiron-backup.json";
+
         link.click();
 
         URL.revokeObjectURL(url);
@@ -765,36 +892,46 @@
 
     $("importBtn").addEventListener(
       "click",
-      () => $("import").click()
+      () => {
+        $("import").click();
+      }
     );
 
     $("import").addEventListener(
       "change",
       (event) => {
-        const file = event.target.files[0];
+        const file =
+          event.target.files[0];
 
         if (!file) {
           return;
         }
 
-        const reader = new FileReader();
+        const reader =
+          new FileReader();
 
         reader.onload = () => {
           try {
-            const data = JSON.parse(
-              reader.result
-            );
+            const data =
+              JSON.parse(
+                reader.result
+              );
 
-            company = data.company || {};
-            trips = Array.isArray(data.trips)
-              ? data.trips
-              : [];
+            company =
+              data.company || {};
+
+            trips =
+              Array.isArray(data.trips)
+                ? data.trips
+                : [];
 
             save();
             loadCompany();
             renderTrips();
 
-            alert("تم استيراد النسخة");
+            alert(
+              "تم استيراد النسخة"
+            );
           } catch {
             alert("ملف غير صالح");
           }

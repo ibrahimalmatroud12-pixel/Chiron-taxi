@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: chiron-taxi
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: JWT_SECRET
+        sync: false
+      - key: DASHBOARD_PASSWORD_HASH
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: CHIRON_ENV
+        value: acceptance
+      - key: CHIRON_CLIENT_ID
+        sync: false
+      - key: CHIRON_CLIENT_SECRET
+        sync: false
+      - key: CHIRON_TOKEN_URL
+        sync: false
+      - key: CHIRON_API_URL
+        sync: false
+      - key: CHIRON_SCOPE
+        sync: false
